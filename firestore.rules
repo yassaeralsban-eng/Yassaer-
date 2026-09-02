@@ -1,0 +1,104 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Users collection - users can read/write their own data (SAD section 15).
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.auth.uid == userId;
+      allow update: if request.auth != null && request.auth.uid == userId
+        && request.resource.data.role == resource.data.role
+        && request.resource.data.status == resource.data.status;
+      allow delete: if false;
+    }
+
+    // Reports collection - public read, owner write (SAD section 15).
+    match /reports/{reportId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.status == 'open';
+      allow update: if request.auth != null
+        && (resource.data.ownerId == request.auth.uid
+            || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['moderator', 'admin']);
+      allow delete: if false;
+    }
+
+    // Private verification - NEVER readable by regular users (SAD section 10).
+    match /private_verification/{reportId} {
+      allow read: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['moderator', 'admin'];
+      allow create: if request.auth != null
+        && get(/databases/$(database)/documents/reports/$(reportId)).data.ownerId == request.auth.uid;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // Match candidates - readable by involved parties (SAD section 12).
+    match /match_candidates/{matchId} {
+      allow read: if request.auth != null
+        && (resource.data.lostReportId == request.auth.uid
+            || resource.data.foundReportId == request.auth.uid
+            || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['moderator', 'admin']);
+      allow create: if false; // Only via Cloud Functions.
+      allow update: if request.auth != null;
+      allow delete: if false;
+    }
+
+    // Recovery requests - readable by involved parties (SAD section 9).
+    match /recovery_requests/{requestId} {
+      allow read: if request.auth != null
+        && (resource.data.requesterId == request.auth.uid
+            || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['moderator', 'admin']);
+      allow create: if request.auth != null
+        && request.resource.data.requesterId == request.auth.uid;
+      allow update: if request.auth != null
+        && (resource.data.requesterId == request.auth.uid
+            || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['moderator', 'admin']);
+      allow delete: if false;
+    }
+
+    // Handover records - readable by involved parties (SAD section 9).
+    match /handover_records/{recordId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null;
+      allow delete: if false;
+    }
+
+    // Abuse reports - create by any user, review by moderators (SAD section 10).
+    match /abuse_reports/{reportId} {
+      allow read: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['moderator', 'admin'];
+      allow create: if request.auth != null
+        && request.resource.data.reporterId == request.auth.uid;
+      allow update: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['moderator', 'admin'];
+      allow delete: if false;
+    }
+
+    // Audit logs - admin only (SAD section 10).
+    match /audit_logs/{logId} {
+      allow read: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      allow write: if false; // Only via Cloud Functions.
+    }
+
+    // Notifications - user reads own (SAD section 19).
+    match /notifications/{notificationId} {
+      allow read: if request.auth != null
+        && resource.data.userId == request.auth.uid;
+      allow create: if false; // Only via Cloud Functions.
+      allow update: if request.auth != null
+        && resource.data.userId == request.auth.uid;
+      allow delete: if false;
+    }
+
+    // Categories - public read, admin write (SAD section 10).
+    match /categories/{categoryId} {
+      allow read: if request.auth != null;
+      allow write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Locations - public read, admin write (SAD section 10).
+    match /locations/{locationId} {
+      allow read: if request.auth != null;
+      allow write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+  }
+}

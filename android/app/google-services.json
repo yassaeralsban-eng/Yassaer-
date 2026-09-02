@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "348983696638",
+    "project_id": "found-39d5d",
+    "storage_bucket": "found-39d5d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:348983696638:android:b4b6197edf0b814aa999af",
+        "android_client_info": {
+          "package_name": "com.example.found"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCW_3_UDcTtCE1vHO5gYQb5HklFFCb6RWc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
