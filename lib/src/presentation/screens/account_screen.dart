@@ -90,13 +90,13 @@ class AccountScreen extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: 18),
-        Container(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border.all(color: kBorder),
+        Material(
+          color: Colors.white,
+          shape: RoundedRectangleBorder(
+            side: const BorderSide(color: kBorder),
             borderRadius: BorderRadius.circular(20),
           ),
+          clipBehavior: Clip.antiAlias,
           child: Column(
             children: settings
                 .map(

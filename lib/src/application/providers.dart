@@ -26,8 +26,17 @@ import '../domain/use_cases/request_recovery.dart';
 
 /// When true, the app uses the in-memory demo repositories so it can run
 /// and be tested without a configured Firebase project.
-/// Flip to false once real Firebase credentials are set up.
-const kDemoMode = bool.fromEnvironment('LAQIT_DEMO', defaultValue: true);
+///
+/// It is a runtime flag (not a compile-time constant) so the app can try to
+/// initialize Firebase at startup and fall back to demo mode gracefully.
+/// Widget tests use the demo repositories out of the box.
+bool kDemoMode = true;
+
+/// Switches the repository implementations used by all providers.
+/// Called once from main() after attempting Firebase initialization.
+void setDemoMode(bool value) {
+  kDemoMode = value;
+}
 
 /// Repository providers (SAD section 8 - Data layer).
 final authRepositoryProvider = Provider<AuthRepository>(
@@ -43,7 +52,9 @@ final matchRepositoryProvider = Provider<MatchRepository>(
 );
 
 final recoveryRepositoryProvider = Provider<RecoveryRepository>(
-  (ref) => kDemoMode ? DemoRecoveryRepository() : FirebaseRecoveryRepository(),
+  (ref) => kDemoMode
+      ? DemoRecoveryRepository()
+      : FirebaseRecoveryRepository(),
 );
 
 final notificationRepositoryProvider = Provider<NotificationRepository>(

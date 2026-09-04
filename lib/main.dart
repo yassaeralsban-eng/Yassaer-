@@ -1,6 +1,8 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'firebase_options.dart';
 import 'src/application/providers.dart';
 import 'src/data/demo_data.dart';
 import 'src/domain/entities/report.dart';
@@ -12,12 +14,21 @@ import 'src/presentation/screens/report_form_screen.dart';
 import 'src/presentation/screens/search_screen.dart';
 import 'src/presentation/theme/app_theme.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  if (kDemoMode) {
-    // وضع العرض التجريبي: بيانات داخل الذاكرة، لا يتطلب Firebase.
+
+  // Try to initialize Firebase (SAD section 7 - Containers).
+  // If Firebase is unavailable (no network, tests, etc.), the app falls
+  // back to the in-memory demo repositories so it remains usable.
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    setDemoMode(false);
+  } catch (_) {
     seedDemoData();
   }
+
   runApp(const ProviderScope(child: LaqitApp()));
 }
 

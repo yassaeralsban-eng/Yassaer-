@@ -22,6 +22,7 @@ import '../../domain/repositories/match_repository.dart';
 import '../../domain/repositories/recovery_repository.dart';
 import '../../domain/repositories/notification_repository.dart';
 import '../../domain/repositories/admin_repository.dart';
+import '../../domain/services/matching_service.dart';
 
 /// Shared in-memory demo store (singleton) so all demo repositories
 /// operate on the same data.
@@ -106,13 +107,73 @@ class DemoAuthRepository implements AuthRepository {
 class DemoReportRepository implements ReportRepository {
   DemoReportRepository();
 
+  /// Broadcasts the full reports list after every mutation,
+  /// simulating Firestore snapshots so live UIs update.
+  final _reportsController = StreamController<List<Report>>.broadcast(
+    sync: true,
+  );
+
+  void _notify() {
+    _reportsController.add(List.of(DemoStore.instance.reports));
+  }
+
   @override
   Future<Report> createReport({
     required Report report,
     required PrivateVerification privateVerification,
   }) async {
-    DemoStore.instance.reports.insert(0, report);
-    DemoStore.instance.private[report.id] = privateVerification;
+    final store = DemoStore.instance;
+    store.reports.insert(0, report);
+    store.private[report.id] = privateVerification;
+
+    // Simulate the onReportCreated Cloud Function (SAD section 18):
+    // scan opposite-type open reports and rank explainable candidates.
+    const service = MatchingService();
+    final oppositeType =
+        report.reportType == ReportType.lost
+            ? ReportType.found
+            : ReportType.lost;
+    final candidates = store.reports
+        .where(
+          (r) =>
+              r.reportType == oppositeType &&
+              r.ownerId != report.ownerId &&
+              r.status == ReportStatus.open,
+        )
+        .toList();
+
+    final scored = <(Report, double)>[];
+    for (final other in candidates) {
+      final lost = report.reportType == ReportType.lost ? report : other;
+      final found = report.reportType == ReportType.found ? report : other;
+      scored.add((other, service.scoreBetween(lost, found)));
+    }
+    scored.sort((a, b) => b.$2.compareTo(a.$2));
+
+    for (final (other, score) in scored.take(3)) {
+      if (score < matchThreshold) continue;
+      final lostId =
+          report.reportType == ReportType.lost ? report.id : other.id;
+      final foundId =
+          report.reportType == ReportType.found ? report.id : other.id;
+      store.matches.insert(
+        0,
+        MatchCandidate(
+          id: '${lostId}_$foundId',
+          lostReportId: lostId,
+          foundReportId: foundId,
+          score: score,
+          factors: service.factorsBetween(
+            report.reportType == ReportType.lost ? report : other,
+            report.reportType == ReportType.found ? report : other,
+          ),
+          status: MatchCandidateStatus.pending,
+          createdAt: DateTime.now(),
+        ),
+      );
+    }
+
+    _notify();
     return report;
   }
 
@@ -121,6 +182,7 @@ class DemoReportRepository implements ReportRepository {
     final store = DemoStore.instance;
     final index = store.reports.indexWhere((r) => r.id == report.id);
     if (index >= 0) store.reports[index] = report;
+    _notify();
     return report;
   }
 
@@ -130,9 +192,9 @@ class DemoReportRepository implements ReportRepository {
 
   @override
   Stream<List<Report>> watchMyReports(String ownerId) async* {
-    yield DemoStore.instance.reports
-        .where((r) => r.ownerId == ownerId)
-        .toList();
+    yield* _reportsController.stream.map(
+      (reports) => reports.where((r) => r.ownerId == ownerId).toList(),
+    );
   }
 
   @override
@@ -180,6 +242,7 @@ class DemoReportRepository implements ReportRepository {
   @override
   Stream<List<Report>> watchPublicReports() async* {
     yield List.of(DemoStore.instance.reports);
+    yield* _reportsController.stream;
   }
 
   @override

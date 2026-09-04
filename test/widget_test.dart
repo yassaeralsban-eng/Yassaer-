@@ -13,9 +13,17 @@ void main() {
 
   Widget wrap(Widget child) => ProviderScope(child: child);
 
+  /// Pumps a bounded number of frames to let async generators resolve,
+  /// avoiding the infinite animation of CircularProgressIndicator.
+  Future<void> settle(WidgetTester tester) async {
+    for (var i = 0; i < 6; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+  }
+
   testWidgets('Laqit starts with its Arabic home screen', (tester) async {
     await tester.pumpWidget(wrap(const LaqitApp()));
-    await tester.pumpAndSettle();
+    await settle(tester);
 
     expect(find.text('لَقِيَت'), findsOneWidget);
     expect(find.text('أبلغ عن مفقود'), findsOneWidget);
@@ -25,12 +33,12 @@ void main() {
 
   testWidgets('a user can create a lost-item report', (tester) async {
     await tester.pumpWidget(wrap(const LaqitApp()));
-    await tester.pumpAndSettle();
+    await settle(tester);
 
     await tester.tap(find.text('أبلغ عن مفقود'));
-    await tester.pumpAndSettle();
+    await settle(tester);
     await tester.tap(find.text('متابعة'));
-    await tester.pumpAndSettle();
+    await settle(tester);
 
     await tester.enterText(find.byType(TextFormField).at(0), 'هاتف أسود');
     await tester.enterText(
@@ -38,9 +46,9 @@ void main() {
       'هاتف أسود فُقد بالقرب من السوق القديم.',
     );
     await tester.tap(find.text('متابعة'));
-    await tester.pumpAndSettle();
+    await settle(tester);
     await tester.tap(find.text('نشر البلاغ'));
-    await tester.pumpAndSettle();
+    await settle(tester);
 
     expect(find.text('هاتف أسود'), findsOneWidget);
     expect(find.text('بلاغاتي'), findsWidgets);
